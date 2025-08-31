@@ -19,7 +19,7 @@
             align-items: center;
             gap: 10px;
         }
-        .date-input {
+        .date-select {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -42,17 +42,15 @@
             <button class="tab-button" onclick="showTab('add')">Add Entry</button>
         </div>
 
-        <!-- Add date filter section -->
+        <!-- Modified date filter section -->
         <div class="filter-container">
             <div class="filter-group">
-                <label for="startDate">Start Date:</label>
-                <input type="date" id="startDate" class="date-input" onchange="filterData()">
+                <label for="dateFilter">Show data from:</label>
+                <select id="dateFilter" class="date-select" onchange="filterData()">
+                    <option value="">All dates</option>
+                </select>
             </div>
-            <div class="filter-group">
-                <label for="endDate">End Date:</label>
-                <input type="date" id="endDate" class="date-input" onchange="filterData()">
-            </div>
-            <button onclick="clearFilters()">Clear Filters</button>
+            <button onclick="clearFilters()">Clear Filter</button>
         </div>
 
         <!-- Rest of the HTML remains the same -->
@@ -62,23 +60,34 @@
     <script>
         // Previous variables and functions remain the same
         
-        // Add these new functions for filtering
+        // Modified filtering functions
+        function populateDateFilter() {
+            const dateSelect = document.getElementById('dateFilter');
+            // Clear existing options except the "All dates" option
+            while (dateSelect.options.length > 1) {
+                dateSelect.remove(1);
+            }
+            
+            // Get unique dates from chartData
+            const dates = [...new Set(chartData.map(item => item.date.split(' ')[0]))];
+            dates.sort(); // Sort dates chronologically
+            
+            // Add dates to the select element
+            dates.forEach(date => {
+                const option = document.createElement('option');
+                option.value = date;
+                option.textContent = date;
+                dateSelect.appendChild(option);
+            });
+        }
 
         function filterData() {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            
+            const selectedDate = document.getElementById('dateFilter').value;
             let filteredData = [...chartData];
 
-            if (startDate) {
+            if (selectedDate) {
                 filteredData = filteredData.filter(item => 
-                    item.date.split(' ')[0] >= startDate
-                );
-            }
-
-            if (endDate) {
-                filteredData = filteredData.filter(item => 
-                    item.date.split(' ')[0] <= endDate
+                    item.date.split(' ')[0] >= selectedDate
                 );
             }
 
@@ -86,8 +95,7 @@
         }
 
         function clearFilters() {
-            document.getElementById('startDate').value = '';
-            document.getElementById('endDate').value = '';
+            document.getElementById('dateFilter').value = '';
             updateChartAndTable(chartData);
         }
 
@@ -167,6 +175,13 @@
                 }
             });
         }
+
+        // Make sure to call populateDateFilter when data is loaded
+        // Add this to your CSV import function or wherever you load the initial data
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            // ... existing CSV processing code ...
+            populateDateFilter(); // Add this line after processing the CSV data
+        });
 
         // Rest of the JavaScript remains the same
     </script>
