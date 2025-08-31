@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Music Charts Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .filter-container {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .date-select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        #tableContainer {
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        .chart-container {
+            margin: 20px 0;
+            height: 400px;
+        }
+        .debug-panel {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 20px 0;
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Music Charts Tracker</h1>
+        
+        <div class="file-actions">
+            <input type="file" id="csvFile" accept=".csv" style="display: none;">
+            <button onclick="document.getElementById('csvFile').click()">Import CSV</button>
+            <button onclick="exportToCSV()">Export to CSV</button>
+            <button onclick="toggleDebugPanel()">Toggle Debug Panel</button>
+        </div>
+
+        <div id="debugPanel" class="debug-panel">
+            <h3>Debug Information</h3>
+            <pre id="debugLog"></pre>
+        </div>
+
+        <div class="filter-container">
+            <div class="filter-group">
+                <label for="dateFilter">Show data from:</label>
+                <select id="dateFilter" class="date-select" onchange="filterData()">
+                    <option value="">All dates</option>
+                </select>
+            </div>
+            <button onclick="clearFilters()">Clear Filter</button>
+        </div>
+
+        <div id="tableContainer">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Position</th>
+                        <th>Title</th>
+                        <th>Streams</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="musicChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Initialize empty array for chart data
+        let chartData = [];
+        
+        // Debug logging function
+        function debugLog(message, data = null) {
+            const debugPanel = document.getElementById('debugLog');
+            const timestamp = new Date().toISOString();
+            const logMessage = data 
+                ? `${timestamp}: ${message}\n${JSON.stringify(data, null, 2)}\n\n`
+                : `${timestamp}: ${message}\n\n`;
+            debugPanel.textContent += logMessage;
+            console.log(message, data);
+        }
+
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // CSV Import functionality
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            debugLog('File selected:', { fileName: file.name, fileSize: file.size });
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                try {
+                    const csvData = event.target.result;
+                    debugLog('CSV data loaded');
+                    
+                    const rows = csvData.split('\n');
+                    debugLog('Number of rows:', rows.length);
+                    
+                    chartData = []; // Clear existing data
+                    
+                    // Process each row (skip header)
+                    for(let i = 1; i < rows.length; i++) {
+                        const row = rows[i].trim();
+                        if (row === '') {
+                            debugLog(`Skipping empty row at index ${i}`);
+                            continue;
+                        }
+                        
+                        const columns = row.split(',');
+                        debugLog(`Processing row ${i}:`, columns);
+                        
+                        if (columns.length >= 4) {
+                            const entry = {
+                                date: columns[0].trim(),
+                                position: columns[1].trim(),
+                                title: columns[2].trim(),
+                                streams: columns[3].trim()
+                            };
+                            chartData.push(entry);
+                            debugLog('Added entry:', entry);
+                        } else {
+                            debugLog(`Invalid row at index ${i}, insufficient columns:`, columns);
+                        }
+                    }
+                    
+                    // Sort data by date
+                    chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
+                    debugLog('Data sorted by date');
+                    
+                    // Update the UI
+                    populateDateFilter();
+                    updateChartAndTable(chartData);
+                    debugLog('UI updated with imported data');
+                } catch (error) {
+                    debugLog('Error processing CSV:', error);
+                    alert('Error processing CSV file. Check debug panel for details.');
+                }
+            };
+            
+            reader.onerror = function(error) {
+                debugLog('Error reading file:', error);
+                alert('Error reading file. Check debug panel for details.');
+            };
+            
+            reader.readAsText(file);
+        });
+
+        function populateDateFilter() {
+            const dateSelect = document.getElementById('dateFilter');
+            debugLog('Populating date filter');
+            
+            // Clear existing options except "All dates"
+            while (dateSelect.options.length > 1) {
+                dateSelect.remove(1);
+            }
+            
+            // Get unique dates from chartData
+            const dates = [...new Set(chartData.map(item => item.date.split(' ')[0]))];
+            dates.sort();
+            debugLog('Unique dates found:', dates);
+            
+            // Add dates to select element
+            dates.forEach(date => {
+                const option = document.createElement('option');
+                option.value = date;
+                option.textContent = date;
+                dateSelect.appendChild(option);
+            });
+            
+            debugLog('Date filter populated with options');
+        }
+
+        function filterData() {
+            const selectedDate = document.getElementById('dateFilter').value;
+            debugLog('Filtering for date:', selectedDate);
+            
+            let filteredData = [...chartData];
+
+            if (selectedDate) {
+                filteredData = filteredData.filter(item => {
+                    const itemDate = item.date.split(' ')[0];
+                    return itemDate >= selectedDate;
+                });
+            }
+
+            debugLog('Filtered data count:', filteredData.length);
+            updateChartAndTable(filteredData);
+        }
+
+        function clearFilters() {
+            document.getElementById('dateFilter').value = '';
+            debugLog('Filters cleared');
+            updateChartAndTable(chartData);
+        }
+
+        function updateChartAndTable(data) {
+            debugLog('Updating chart and table with data count:', data.length);
+            updateTable(data);
+            updateChart(data);
+        }
+
+        function updateTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.date}</td>
+                    <td>${row.position}</td>
+                    <td>${row.title}</td>
+                    <td>${row.streams}</td>
+                    <td>
+                        <button onclick="deleteEntry(${index})">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function updateChart(data) {
+            const ctx = document.getElementById('musicChart').getContext('2d');
+            
+            const titles = [...new Set(data.map(item => item.title))];
+            const dates = [...new Set(data.map(item => item.date))];
+            
+            const datasets = titles.map(title => {
+                const titleData = data.filter(item => item.title === title);
+                return {
+                    label: title,
+                    data: dates.map(date => {
+                        const entry = titleData.find(item => item.date === date);
+                        return entry ? parseInt(entry.streams) : null;
+                    }),
+                    borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                    tension: 0.1
+                };
+            });
+
+            if (window.myChart) {
+                window.myChart.destroy();
+            }
+
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Streams Over Time'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Streams'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            debugLog('Chart updated');
+        }
+
+        function deleteEntry(index) {
+            debugLog('Deleting entry at index:', index);
+            chartData.splice(index, 1);
+            updateChartAndTable(chartData);
+            populateDateFilter();
+        }
+
+        function exportToCSV() {
+            if (chartData.length === 0) {
+                debugLog('No data to export');
+                alert('No data to export');
+                return;
+            }
+
+            const csvContent = 'Date,Position,Title,Streams\n' + 
+                chartData.map(row => 
+                    `${row.date},${row.position},${row.title},${row.streams}`
+                ).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'chart_data.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            debugLog('Data exported to CSV');
+        }
+
+        // Initialize debug log
+        debugLog('Application initialized');
+    </script>
+</body>
+</html>
