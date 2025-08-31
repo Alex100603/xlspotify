@@ -1,189 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Music Charts Tracker</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* Previous styles remain the same */
-        .filter-container {
-            background-color: #f0f0f0;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .date-select {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            width: 200px;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XLSpotify</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Music Charts Tracker</h1>
-        
-        <div class="file-actions">
-            <input type="file" id="csvFile" accept=".csv" style="display: none;">
-            <button onclick="document.getElementById('csvFile').click()">Import CSV</button>
-            <button onclick="exportToCSV()">Export to CSV</button>
-        </div>
-
-        <div class="tabs">
-            <button class="tab-button active" onclick="showTab('view')">View Charts</button>
-            <button class="tab-button" onclick="showTab('add')">Add Entry</button>
-        </div>
-
-        <!-- Modified date filter section -->
-        <div class="filter-container">
-            <div class="filter-group">
-                <label for="dateFilter">Show data from:</label>
-                <select id="dateFilter" class="date-select" onchange="filterData()">
-                    <option value="">All dates</option>
-                </select>
-            </div>
-            <button onclick="clearFilters()">Clear Filter</button>
-        </div>
-
-        <!-- Rest of the HTML remains the same -->
-        <!-- Previous divs for viewTab, addTab, etc. remain the same -->
+    <div id="container">
+        <h1>Welcome to XLSpotify</h1>
+        <!-- Missing table container -->
+        <div id="data-table"></div>
+        <!-- Missing chart container -->
+        <div id="chart-container"></div>
     </div>
-
     <script>
-        // Previous variables and functions remain the same
-        
-        // Modified filtering functions
-        function populateDateFilter() {
-            const dateSelect = document.getElementById('dateFilter');
-            // Clear existing options except the "All dates" option
-            while (dateSelect.options.length > 1) {
-                dateSelect.remove(1);
-            }
-            
-            // Get unique dates from chartData
-            const dates = [...new Set(chartData.map(item => item.date.split(' ')[0]))];
-            dates.sort(); // Sort dates chronologically
-            
-            // Add dates to the select element
-            dates.forEach(date => {
-                const option = document.createElement('option');
-                option.value = date;
-                option.textContent = date;
-                dateSelect.appendChild(option);
-            });
-        }
+        // Initialize chartData array
+        const chartData = [];
 
-        function filterData() {
-            const selectedDate = document.getElementById('dateFilter').value;
-            let filteredData = [...chartData];
-
-            if (selectedDate) {
-                filteredData = filteredData.filter(item => 
-                    item.date.split(' ')[0] >= selectedDate
-                );
-            }
-
-            updateChartAndTable(filteredData);
-        }
-
-        function clearFilters() {
-            document.getElementById('dateFilter').value = '';
-            updateChartAndTable(chartData);
-        }
-
-        // Modify updateChartAndTable to accept filtered data
-        function updateChartAndTable(data = chartData) {
-            updateTable(data);
-            updateChart(data);
-        }
-
-        // Modify updateTable to use filtered data
-        function updateTable(data) {
-            const tableBody = document.getElementById('tableBody');
-            tableBody.innerHTML = '';
-            
-            data.forEach((row, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.date}</td>
-                    <td>${row.position}</td>
-                    <td>${row.title}</td>
-                    <td>${row.streams}</td>
-                    <td>
-                        <button onclick="deleteEntry(${index})" style="background-color: #ff4444;">Delete</button>
-                    </td>
-                `;
-                tableBody.appendChild(tr);
-            });
-        }
-
-        // Modify updateChart to use filtered data
-        function updateChart(data) {
-            const ctx = document.getElementById('musicChart').getContext('2d');
-            
-            const titles = [...new Set(data.map(item => item.title))];
-            const dates = [...new Set(data.map(item => item.date))];
-            
-            const datasets = titles.map(title => {
-                const titleData = data.filter(item => item.title === title);
-                return {
-                    label: title,
-                    data: dates.map(date => {
-                        const entry = titleData.find(item => item.date === date);
-                        return entry ? parseInt(entry.streams) : null;
-                    }),
-                    borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
-                    tension: 0.1
-                };
-            });
-
-            if (window.myChart) {
-                window.myChart.destroy();
-            }
-
-            window.myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Streams Over Time'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Streams'
-                            }
-                        }
-                    }
+        function importCSV(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const csvData = event.target.result;
+                try {
+                    // CSV parsing logic goes here
+                    // Example: Parse CSV and handle dates
+                    const rows = csvData.split('\n');
+                    rows.forEach((row, index) => {
+                        const columns = row.split(',');
+                        // Process the columns and parse dates
+                        // Add debug log
+                        console.log(`Row ${index}:`, columns);
+                    });
+                } catch (error) {
+                    console.error('Error parsing CSV:', error);
                 }
-            });
+            };
+            reader.readAsText(file);
         }
 
-        // Make sure to call populateDateFilter when data is loaded
-        // Add this to your CSV import function or wherever you load the initial data
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            // ... existing CSV processing code ...
-            populateDateFilter(); // Add this line after processing the CSV data
-        });
-
-        // Rest of the JavaScript remains the same
+        // Add debug logging to track data flow
+        console.log('Chart Data Initialized:', chartData);
     </script>
 </body>
 </html>
